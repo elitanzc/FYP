@@ -219,18 +219,23 @@ def get_metrics(true, out_est, out_bftrain, out_hat):
     count_nonzeros_S_new = []
     relative_err_old = []
     relative_err_new = []
+    
+    mse = nn.MSELoss()
+    
     for i, (L_true, S_true, M_true) in enumerate(true):
-        # between true and classical
-        fro_norm_L_old.append()
-        mse_S_old.append()
-        fro_norm_S_old.append()
-        count_nonzeros_S_old.append()
-        relative_err_old.append()
+        # between true and classical/ est
+        L0, S0 = out_est[i][:2]
+        fro_norm_L_old.append(torch.linalg.norm(L_true - L0))
+        mse_S_old.append(mse(S_true, S0))
+        fro_norm_S_old.append(torch.linalg.norm(S_true - S0))
+        count_nonzeros_S_old.append(torch.count_nonzero(S_true - S0))
+        relative_err_old.append(torch.linalg.norm(M_true - L0 - S0)/ torch.linalg.norm(M_true))
         
         # between true and hat
-        fro_norm_L_new.append()
-        mse_S_new.append()
-        fro_norm_S_new.append()
-        count_nonzeros_S_new.append()
-        relative_err_new.append()
+        L_hat, S_hat = out_hat[i]
+        fro_norm_L_new.append(torch.linalg.norm(L_true - L_hat))
+        mse_S_new.append(mse(S_true, S_hat))
+        fro_norm_S_new.append(torch.linalg.norm(S_true - S_hat))
+        count_nonzeros_S_new.append(torch.count_nonzero(S_true - S_hat))
+        relative_err_new.append(torch.linalg.norm(M_true - L_hat - S_hat)/ torch.linalg.norm(M_true))
 
