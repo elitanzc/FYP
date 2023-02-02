@@ -208,8 +208,29 @@ def get_metrics(L_hat, L_true, S_hat, S_true):
     
     
 
-def get_metrics(true, out_classical, out_bftrain, out_hat):
-    # between true and classical
-    # between true and hat
-
+def get_metrics(true, out_est, out_bftrain, out_hat):
+    fro_norm_L_old = []
+    fro_norm_L_new = []
+    mse_S_old = []
+    mse_S_new = []
+    fro_norm_S_old = []
+    fro_norm_S_new = []
+    count_nonzeros_S_old = []
+    count_nonzeros_S_new = []
+    relative_err_old = []
+    relative_err_new = []
+    for i, (L_true, S_true, M_true) in enumerate(true):
+        # between true and classical
+        fro_norm_L_old.append()
+        mse_S_old.append()
+        fro_norm_S_old.append()
+        count_nonzeros_S_old.append()
+        relative_err_old.append()
+        
+        # between true and hat
+        fro_norm_L_new.append()
+        mse_S_new.append()
+        fro_norm_S_new.append()
+        count_nonzeros_S_new.append()
+        relative_err_new.append()
 
