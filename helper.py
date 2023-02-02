@@ -162,21 +162,16 @@ def generate_train_test(dataset_size, r,d1,d2,alpha, c):
 def get_net_outputs(net_trained, net_bftrain, r, dataset):
     out_bftrain = []
     out_hat = []
-    out_accaltproj = []
     for L_true, S_true, M_true in dataset:
         L_bftrain, S_bftrain = net_bftrain(M_true, r)
         out_bftrain.append((L_bftrain, S_bftrain))
-        plt.plot(np.array(net_bftrain.loss))
+        plt.plot(np.array(net_bftrain.loss), '-b')
         
         L_hat, S_hat = net_trained(M_true, r)
         out_hat.append((L_hat, S_hat))
-        plt.plot(np.array(net_trained.loss))
-        
-        loss_accaltproj, L_accaltproj, S_accaltproj = AccAltProj(M0, r, 1e-06, torch.tensor(0.7), 40)
-        out_accaltproj.append((L_accaltproj, S_accaltproj))
-    
+        plt.plot(np.array(net_trained.loss), 'r:')
     plt.show()
-    return out_bftrain, out_hat, out_accaltproj
+    return out_bftrain, out_hat
 
 
 
@@ -210,5 +205,11 @@ def get_metrics(L_hat, L_true, S_hat, S_true):
     print("||S - S_hat||1:", torch.linalg.norm(S_true - S_hat, 1)/ torch.linalg.norm(S_true, 1))
     print(torch.count_nonzero(S_true - S_bftrain))
     print(torch.count_nonzero(S_true - S_hat))
+    
+    
+
+def get_metrics(true, out_classical, out_bftrain, out_hat):
+    # between true and classical
+    # between true and hat
 
 
