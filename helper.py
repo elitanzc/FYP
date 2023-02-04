@@ -160,17 +160,21 @@ def generate_train_test(dataset_size, r,d1,d2,alpha, c):
     
 
 def get_net_outputs(net_trained, net_bftrain, r, dataset):
-    out_bftrain = np.array([])
-    out_hat = np.array([])
+    out_bftrain = [] #np.array([])
+    out_hat = [] #np.array([])
     for i in range(len(dataset)):
         M_true = dataset[i][2]
         L_bftrain, S_bftrain = net_bftrain(M_true, r)
-        out_bftrain = np.append(out_bftrain, [L_bftrain.detach().numpy(), S_bftrain.detach().numpy()])
+        #out_bftrain = np.append(out_bftrain, [L_bftrain.detach().numpy(), S_bftrain.detach().numpy()])
+        out_bftrain.append((L_bftrain.detach().numpy(), S_bftrain.detach().numpy()))
         L_hat, S_hat = net_trained(M_true, r)
-        out_hat = np.append(out_hat, [L_hat.detach().numpy(), S_hat.detach().numpy()])
-    d1, d2 = M_true.shape
-    out_bftrain = np.reshape(out_bftrain, [len(dataset), 2, d1, d2], order='A')
-    out_hat = np.reshape(out_hat, [len(dataset), 2, d1, d2], order='A')
+        #out_hat = np.append(out_hat, [L_hat.detach().numpy(), S_hat.detach().numpy()])
+        out_hat.append((L_hat.detach().numpy(), S_hat.detach().numpy()))
+    #d1, d2 = M_true.shape
+    #out_bftrain = np.reshape(out_bftrain, [len(dataset), 2, d1, d2], order='A')
+    #out_hat = np.reshape(out_hat, [len(dataset), 2, d1, d2], order='A')
+    out_bftrain = np.asarray(out_bftrain)
+    out_hat = np.asarray(out_hat)
     return out_bftrain, out_hat
 
 def boo():
@@ -229,6 +233,19 @@ def get_metrics(true, out_est, out_bftrain, out_hat):
         fro_norm_S_new.append(np.linalg.norm(S_true - S_hat))
         count_nonzeros_S_new.append(np.count_nonzero(S_true - S_hat))
         relative_err_new.append(np.linalg.norm(M_true - L_hat - S_hat)/ np.linalg.norm(M_true))
+
+
+
+def count_outliers(arr):
+    q1 = np.quantile(arr, 0.25)
+    q3 = np.quantile(arr, 0.75) 
+    iqr = q3 - q1
+    upper_bound = q3 + (1.5 * iqr)
+    lower_bound = q1 - (1.5 * iqr)
+    arr = arr[(arr <= lower_bound) | (arr >= upper_bound)]
+    return len(arr)
+
+
 
 
 
