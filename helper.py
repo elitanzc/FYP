@@ -12,8 +12,7 @@ import math
 
 
 
-def hello():
-    print("hello!")
+
 
 
 ## Code to generate data for RPCA problem. References:
