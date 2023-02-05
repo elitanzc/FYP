@@ -159,26 +159,45 @@ def generate_train_test(dataset_size, r,d1,d2,alpha, c):
     
     
 
+## train unrolled network with Adam optimizer
+def train_nn(net, r, lr, weight_decay, nepochs, dataset):
+    params_bftrain = [x.clone().detach().numpy() for x in list(net.parameters())]
+    optimizer = Adam(net.parameters(), lr=lr, weight_decay=weight_decay)
+    l0_norm_of_S_Shat = []
+    for epoch in range(nepochs):
+        for i in range(len(dataset)// nepochs):
+            L0, S0, M0 = dataset[i]
+            optimizer.zero_grad()
+            L_hat, S_hat = net(M0, r)
+            # loss = torch.pow(torch.linalg.norm(L0 - L_hat), 2) \
+            #         + torch.pow(torch.linalg.norm(S0 - S_hat), 2) \
+            #         + torch.pow(torch.linalg.norm(M0 - L_hat - S_hat), 2)
+            loss = torch.linalg.norm(L0 - L_hat)/ torch.linalg.norm(L0) \
+                    + torch.linalg.norm(S0 - S_hat)/ torch.linalg.norm(S0)
+            loss.backward()
+            optimizer.step()
+            l0_norm_of_S_Shat.append(torch.count_nonzero(S0 - S_hat))
+        print(list(net.parameters()))
+        print('Epoch ' + str(epoch+1) +'/' + str(nepochs) +' at cost=' + str(loss.item()))
+    print('Finished Training')
+    params_aftrain = [x.clone().detach().numpy() for x in list(net.parameters())]
+    return net, params_bftrain, params_aftrain, l0_norm_of_S_Shat
+
+
+
+## gets (L, S) of unrolled network (both before and after training)
 def get_net_outputs(net_trained, net_bftrain, r, dataset):
-    out_bftrain = [] #np.array([])
-    out_hat = [] #np.array([])
+    out_bftrain = []
+    out_hat = []
     for i in range(len(dataset)):
         M_true = dataset[i][2]
         L_bftrain, S_bftrain = net_bftrain(M_true, r)
-        #out_bftrain = np.append(out_bftrain, [L_bftrain.detach().numpy(), S_bftrain.detach().numpy()])
         out_bftrain.append((L_bftrain.detach().numpy(), S_bftrain.detach().numpy()))
         L_hat, S_hat = net_trained(M_true, r)
-        #out_hat = np.append(out_hat, [L_hat.detach().numpy(), S_hat.detach().numpy()])
         out_hat.append((L_hat.detach().numpy(), S_hat.detach().numpy()))
-    #d1, d2 = M_true.shape
-    #out_bftrain = np.reshape(out_bftrain, [len(dataset), 2, d1, d2], order='A')
-    #out_hat = np.reshape(out_hat, [len(dataset), 2, d1, d2], order='A')
     out_bftrain = np.asarray(out_bftrain)
     out_hat = np.asarray(out_hat)
     return out_bftrain, out_hat
-
-def boo():
-    print("boo")
 
 
 
@@ -204,35 +223,58 @@ def plot_true_vs_est_matrices(L_hat, L_true, S_hat, S_true):
 
 
 def get_metrics(true, out_est, out_bftrain, out_hat):
+    # metrics between true and classical/est
     fro_norm_L_old = []
-    fro_norm_L_new = []
     mse_S_old = []
-    mse_S_new = []
     fro_norm_S_old = []
-    fro_norm_S_new = []
     count_nonzeros_S_old = []
-    count_nonzeros_S_new = []
     relative_err_old = []
+    # metrics between true and hat
+    fro_norm_L_new = []
+    mse_S_new = []
+    fro_norm_S_new = []
+    count_nonzeros_S_new = []
     relative_err_new = []
-    
+    # metrics between true and bftrain
+    fro_norm_L_bftrain = []
+    mse_S_bftrain = []
+    fro_norm_S_bftrain = []
+    count_nonzeros_S_bftrain = []
+    relative_err_bftrain = []
+
     mse = nn.MSELoss()
-    
+
     for i, (L_true, S_true, M_true) in enumerate(true):
-        # between true and classical/ est
-        L0, S0 = out_est[i][:2]
-        fro_norm_L_old.append(np.linalg.norm(L_true - L0))
-        mse_S_old.append(mse(S_true, S0))
-        fro_norm_S_old.append(np.linalg.norm(S_true - S0))
-        count_nonzeros_S_old.append(np.count_nonzero(S_true - S0))
-        relative_err_old.append(np.linalg.norm(M_true - L0 - S0)/ np.linalg.norm(M_true))
-        
+        # between true and classical/est
+        L0, S0 = out_est[i]
+        fro_norm_L_old.append(torch.linalg.norm(L_true - L0).detach().numpy())
+        mse_S_old.append(mse(S_true, S0).detach().numpy())
+        fro_norm_S_old.append(torch.linalg.norm(S_true - S0).detach().numpy())
+        count_nonzeros_S_old.append(torch.count_nonzero(S_true - S0).detach().numpy())
+        relative_err_old.append((torch.linalg.norm(M_true - L0 - S0)/ torch.linalg.norm(M_true)).detach().numpy())
         # between true and hat
         L_hat, S_hat = out_hat[i]
-        fro_norm_L_new.append(np.linalg.norm(L_true - L_hat))
-        mse_S_new.append(mse(S_true, S_hat))
-        fro_norm_S_new.append(np.linalg.norm(S_true - S_hat))
-        count_nonzeros_S_new.append(np.count_nonzero(S_true - S_hat))
-        relative_err_new.append(np.linalg.norm(M_true - L_hat - S_hat)/ np.linalg.norm(M_true))
+        fro_norm_L_new.append(torch.linalg.norm(L_true - L_hat).detach().numpy())
+        mse_S_new.append(mse(S_true, torch.tensor(S_hat)).detach().numpy())
+        fro_norm_S_new.append(torch.linalg.norm(S_true - S_hat).detach().numpy())
+        count_nonzeros_S_new.append(torch.count_nonzero(S_true - S_hat).detach().numpy())
+        relative_err_new.append((torch.linalg.norm(M_true - L_hat - S_hat)/ torch.linalg.norm(M_true)).detach().numpy())
+        # between true and bftrain
+        L_bftrain, S_bftrain = out_bftrain[i]
+        fro_norm_L_bftrain.append(torch.linalg.norm(L_true - L_bftrain).detach().numpy())
+        mse_S_bftrain.append(mse(S_true, torch.tensor(S_bftrain)).detach().numpy())
+        fro_norm_S_bftrain.append(torch.linalg.norm(S_true - S_bftrain).detach().numpy())
+        count_nonzeros_S_bftrain.append(torch.count_nonzero(S_true - S_bftrain).detach().numpy())
+        relative_err_bftrain.append((torch.linalg.norm(M_true - L_bftrain - S_bftrain)/ torch.linalg.norm(M_true)).detach().numpy())
+    return {"fro_norm_L_old": fro_norm_L_old, "mse_S_old": mse_S_old \
+            , "fro_norm_S_old": fro_norm_S_old, "count_nonzeros_S_old": count_nonzeros_S_old \
+            , "relative_err_old": relative_err_old \
+            , "fro_norm_L_new": fro_norm_L_new, "mse_S_new": mse_S_new \
+            , "fro_norm_S_new": fro_norm_S_new, "count_nonzeros_S_new": count_nonzeros_S_new \
+            , "relative_err_new": relative_err_new \
+            , "fro_norm_L_bftrain": fro_norm_L_bftrain, "mse_S_bftrain": mse_S_bftrain \
+            , "fro_norm_S_bftrain": fro_norm_S_bftrain, "count_nonzeros_S_bftrain": count_nonzeros_S_bftrain \
+            , "relative_err_bftrain": relative_err_bftrain }
 
 
 
@@ -248,70 +290,3 @@ def count_outliers(arr):
 
 
 
-
-
-class InitStage(nn.Module):
-    def __init__(self):
-        super().__init__()
-    def forward(self, M0, r):
-        m, n = M0.shape
-        norm_of_M0 = torch.linalg.norm(M0)
-        beta = 1/(2 * np.power(m * n, 1/4))
-        beta_init = 4 * beta
-        zeta = beta_init * torch.linalg.norm(M0, 2)
-        S = thres(M0, zeta, hard=False)
-        U, Sigma, V = torch.linalg.svd(M0 - S, full_matrices=False)
-        U, Sigma, V = U[:,:r], Sigma[:r], V.t()[:, :r]
-        L = U @ torch.diag(Sigma) @ V.t()
-        zeta = beta * Sigma[0]
-        S = M0 - L
-        S = thres(S, zeta, hard=False)
-        return S, L, U, V, beta, norm_of_M0
-
-class ProjStage(nn.Module):
-    def __init__(self, gamma, lay):
-        super().__init__()
-        self.gamma = gamma
-        self.lay = lay
-    def forward(self, M0, S, U, V, r, beta):
-        ## Update L
-        Z = M0 - S
-        Q1, R1 = torch.linalg.qr(Z.t() @ U - V @ ((Z @ V).t() @ U)) ## reduced QR
-        Q2, R2 = torch.linalg.qr(Z @ V - U @ (U.t() @ Z @ V)) ## reduced QR
-        A = torch.cat((torch.cat((U.t() @ Z @ V, R1.t()), 1), 
-                        torch.cat((R2, torch.zeros(R2.shape)), 1)), 0) ## A is 2r x 2r matrix
-        Um, Sm, Vm = torch.linalg.svd(A, full_matrices=False)
-        U = torch.cat((U, Q2), 1) @ Um[:,:r]
-        V = torch.cat((V, Q1), 1) @ Vm.t()[:,:r]
-        L = U @ torch.diag(Sm[:r]) @ V.t()
-        ## Update S
-        zeta = beta * (Sm[r] + torch.pow(self.gamma, self.lay) * Sm[0])
-        S = M0 - L
-        S = thres(S, zeta, hard=False)
-        return S, L, U, V
-
-class LearnedAAP(nn.Module):
-    def __init__(self, max_iter):
-        super().__init__()
-        self.max_iter = max_iter
-        self.gamma = nn.Parameter(torch.tensor(0.7))
-        # self.beta = nn.Parameter(torch.tensor(0.05))
-
-        ## Stack layers
-        self.layer = [InitStage()]
-        for t in range(max_iter):
-            #self.layer.append(ProjStage(gamma = nn.Parameter(torch.pow(self.gamma.clone().detach(), t + 1).requires_grad_(True))))
-            #self.layer.append(ProjStage(gamma = nn.Parameter(self.gamma.clone().detach().requires_grad_(True))))
-            self.layer.append(ProjStage(self.gamma, t+1))
-        self.layers = nn.Sequential(*self.layer)
-        ## Track loss
-        self.loss = np.zeros(max_iter + 1)
-
-    def forward(self, M0, r):
-        lay_init = self.layers[0]
-        S, L, U, V, beta, norm_of_M0 = lay_init(M0, r)
-        for t in range(1, self.max_iter + 1):
-            lay = self.layers[t]
-            S, L, U, V = lay(M0, S, U, V, r, beta)
-            self.loss[t] = torch.linalg.norm(M0 - L - S)/ norm_of_M0
-        return L, S
