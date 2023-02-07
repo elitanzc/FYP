@@ -145,7 +145,7 @@ def generate_train_test(dataset_size, r,d1,d2,alpha, c):
     torch.manual_seed(0)
     test = []
     train = []
-    test_indices = random.sample(range(dataset_size), int(0.1 * dataset_size))
+    test_indices = random.sample(range(dataset_size), int(0.4 * dataset_size))
     for i in range(dataset_size):
         L, S, M = generate_problem(r,d1,d2,alpha, c)
         if i in test_indices:
@@ -159,25 +159,49 @@ def generate_train_test(dataset_size, r,d1,d2,alpha, c):
     
 
 ## train unrolled network with Adam optimizer
+# def train_nn(net, r, lr, weight_decay, nepochs, dataset):
+#     params_bftrain = [x.clone().detach().numpy() for x in list(net.parameters())]
+#     optimizer = Adam(net.parameters(), lr=lr, weight_decay=weight_decay)
+#     l0_norm_of_S_Shat = []
+#     for epoch in range(nepochs):
+#         for i in range(len(dataset)// nepochs):
+#             L0, S0, M0 = dataset[i]
+#             optimizer.zero_grad()
+#             L_hat, S_hat = net(M0, r)
+#             # loss = torch.pow(torch.linalg.norm(L0 - L_hat), 2) \
+#             #         + torch.pow(torch.linalg.norm(S0 - S_hat), 2) \
+#             #         + torch.pow(torch.linalg.norm(M0 - L_hat - S_hat), 2)
+#             loss = torch.linalg.norm(L0 - L_hat)/ torch.linalg.norm(L0) \
+#                     + torch.linalg.norm(S0 - S_hat)/ torch.linalg.norm(S0)
+#             loss.backward()
+#             optimizer.step()
+#             l0_norm_of_S_Shat.append(torch.count_nonzero(S0 - S_hat))
+#         print(list(net.parameters()))
+#         print('Epoch ' + str(epoch+1) +'/' + str(nepochs) +' at cost=' + str(loss.item()))
+#     print('Finished Training')
+#     params_aftrain = [x.clone().detach().numpy() for x in list(net.parameters())]
+#     return net, params_bftrain, params_aftrain, l0_norm_of_S_Shat
+
+
 def train_nn(net, r, lr, weight_decay, nepochs, dataset):
     params_bftrain = [x.clone().detach().numpy() for x in list(net.parameters())]
     optimizer = Adam(net.parameters(), lr=lr, weight_decay=weight_decay)
     l0_norm_of_S_Shat = []
     for epoch in range(nepochs):
-        for i in range(len(dataset)// nepochs):
+        for i in range(len(dataset)):
             L0, S0, M0 = dataset[i]
             optimizer.zero_grad()
             L_hat, S_hat = net(M0, r)
-            # loss = torch.pow(torch.linalg.norm(L0 - L_hat), 2) \
-            #         + torch.pow(torch.linalg.norm(S0 - S_hat), 2) \
-            #         + torch.pow(torch.linalg.norm(M0 - L_hat - S_hat), 2)
-            loss = torch.linalg.norm(L0 - L_hat)/ torch.linalg.norm(L0) \
-                    + torch.linalg.norm(S0 - S_hat)/ torch.linalg.norm(S0)
+            loss = torch.pow(torch.linalg.norm(L0 - L_hat), 2)/ torch.pow(torch.linalg.norm(L0), 2) \
+                    + torch.pow(torch.linalg.norm(S0 - S_hat), 2)/ torch.pow(torch.linalg.norm(S0), 2) \
+                    #+ torch.pow(torch.linalg.norm(M0 - L_hat - S_hat), 2)
+            # loss = torch.linalg.norm(L0 - L_hat)/ torch.linalg.norm(L0) \
+            #         + torch.linalg.norm(S0 - S_hat)/ torch.linalg.norm(S0)
             loss.backward()
             optimizer.step()
             l0_norm_of_S_Shat.append(torch.count_nonzero(S0 - S_hat))
-        print(list(net.parameters()))
-        print('Epoch ' + str(epoch+1) +'/' + str(nepochs) +' at cost=' + str(loss.item()))
+            print(list(net.parameters()))
+            print('Epoch ' + str(epoch+1) +'/' + str(nepochs) +' at cost=' + str(loss.item()))
     print('Finished Training')
     params_aftrain = [x.clone().detach().numpy() for x in list(net.parameters())]
     return net, params_bftrain, params_aftrain, l0_norm_of_S_Shat
