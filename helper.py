@@ -312,4 +312,12 @@ def count_outliers(arr):
 
 
 
+def mat_support(mat1, mat2):
+    mat1 = (mat1 == 0)
+    mat2 = (mat2 == 0)
+    return torch.sum((mat1 == mat2).int())/ torch.numel(mat1)
+
+
+
+
 
