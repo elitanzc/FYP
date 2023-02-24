@@ -36,11 +36,15 @@ def generate_problem(r,d1,d2,alpha, c):
 
 
 
-def thres(inputs, threshold, hard=True):
+def thres(inputs, threshold, hard=True, old=True):
     if not hard:
-        out = torch.sign(inputs) * torch.max(torch.abs(inputs)- threshold, torch.zeros([1,1]))
+        out = torch.sign(inputs) * torch.max(torch.abs(inputs)- threshold, torch.zeros(inputs.shape))
     else:
-        out = inputs * (torch.abs(inputs) > threshold)
+        if old:
+            out = inputs * (torch.abs(inputs) > threshold)
+        else:
+            # m = 3 odd, mth order approximation
+            out = inputs * torch.max(1 - (torch.div(torch.pow(threshold, 10), torch.pow(inputs, 10))), torch.zeros(inputs.shape))
     return out
 
 
@@ -89,8 +93,8 @@ def AccAltProj(M0, r, tol, gamma, max_iter):
         ## Compute error
         err = torch.linalg.norm(M0 - L - S)/ norm_of_M0
         loss.append(err)
-        if err < tol:
-            return loss, L, S
+        # if err < tol:
+        #     return loss, L, S
     return loss, L, S
 
 
@@ -129,10 +133,10 @@ def IRCUR(M0, r, tol, gamma, con, max_iter):
         ## update loss
         err = (torch.linalg.norm(M0_rows - L_rows - S_rows) + torch.linalg.norm(M0_cols - L_cols - S_cols))/ norm_of_M0
         loss.append(err)
-        if err < tol:
-            L = C @ pinv_U @ R
-            S = thres(M0 - L, zeta)
-            return loss, L, S
+        # if err < tol:
+        #     L = C @ pinv_U @ R
+        #     S = thres(M0 - L, zeta)
+        #     return loss, L, S
     L = C @ pinv_U @ R
     S = thres(M0 - L, zeta)
     return loss, L, S
@@ -201,6 +205,7 @@ def train_nn(net, r, lr, weight_decay, nepochs, dataset):
             optimizer.step()
             l0_norm_of_S_Shat.append(torch.count_nonzero(S0 - S_hat))
             print(list(net.parameters()))
+            print(net.gamma.grad, net.beta.grad)
             print('Epoch ' + str(epoch+1) +'/' + str(nepochs) +' at cost=' + str(loss.item()))
     print('Finished Training')
     params_aftrain = [x.clone().detach().numpy() for x in list(net.parameters())]
@@ -245,6 +250,11 @@ def plot_true_vs_est_matrices(L_hat, L_true, S_hat, S_true):
 
 
 
+def mat_support_err(mat1, mat2):
+    mat1 = (torch.tensor(mat1) == 0)
+    mat2 = (torch.tensor(mat2) == 0)
+    return torch.sum((mat1 != mat2).int())/ torch.numel(mat1)
+
 def get_metrics(true, out_est, out_bftrain, out_hat):
     # metrics between true and classical/est
     fro_norm_L_old = []
@@ -273,21 +283,21 @@ def get_metrics(true, out_est, out_bftrain, out_hat):
         fro_norm_L_old.append(torch.linalg.norm(L_true - L0).detach().numpy())
         mse_S_old.append(mse(S_true, S0).detach().numpy())
         fro_norm_S_old.append(torch.linalg.norm(S_true - S0).detach().numpy())
-        count_nonzeros_S_old.append(torch.count_nonzero(S_true - S0).detach().numpy())
+        count_nonzeros_S_old.append(mat_support_err(S_true, S0).detach().numpy())
         relative_err_old.append((torch.linalg.norm(M_true - L0 - S0)/ torch.linalg.norm(M_true)).detach().numpy())
         # between true and hat
         L_hat, S_hat = out_hat[i]
         fro_norm_L_new.append(torch.linalg.norm(L_true - L_hat).detach().numpy())
         mse_S_new.append(mse(S_true, torch.tensor(S_hat)).detach().numpy())
         fro_norm_S_new.append(torch.linalg.norm(S_true - S_hat).detach().numpy())
-        count_nonzeros_S_new.append(torch.count_nonzero(S_true - S_hat).detach().numpy())
+        count_nonzeros_S_new.append(mat_support_err(S_true, S_hat).detach().numpy())
         relative_err_new.append((torch.linalg.norm(M_true - L_hat - S_hat)/ torch.linalg.norm(M_true)).detach().numpy())
         # between true and bftrain
         L_bftrain, S_bftrain = out_bftrain[i]
         fro_norm_L_bftrain.append(torch.linalg.norm(L_true - L_bftrain).detach().numpy())
         mse_S_bftrain.append(mse(S_true, torch.tensor(S_bftrain)).detach().numpy())
         fro_norm_S_bftrain.append(torch.linalg.norm(S_true - S_bftrain).detach().numpy())
-        count_nonzeros_S_bftrain.append(torch.count_nonzero(S_true - S_bftrain).detach().numpy())
+        count_nonzeros_S_bftrain.append(mat_support_err(S_true, S_bftrain).detach().numpy())
         relative_err_bftrain.append((torch.linalg.norm(M_true - L_bftrain - S_bftrain)/ torch.linalg.norm(M_true)).detach().numpy())
     return {"fro_norm_L_old": fro_norm_L_old, "mse_S_old": mse_S_old \
             , "fro_norm_S_old": fro_norm_S_old, "count_nonzeros_S_old": count_nonzeros_S_old \
